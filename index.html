@@ -1,0 +1,860 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Satisfador 2.0 - Combinador de Análises</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Usando uma versão mais recente e robusta do SheetJS -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #111827;
+        }
+        .agent-details { display: none; }
+        .agent-header.open + .agent-details { display: table-row-group; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .spinner {
+            border: 4px solid rgba(255, 255, 255, 0.1);
+            border-left-color: #09f;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+        }
+        .btn-lift { transition: all 0.2s ease-out; }
+        .btn-lift:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        .combiner-container {
+            max-height: 150px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <div class="container mx-auto max-w-7xl p-4 md:p-8">
+        
+        <header class="mb-8 p-6 bg-gray-800 rounded-lg border border-gray-700 shadow-lg">
+            <h1 class="text-3xl font-bold text-gray-100">Satisfador 2.0</h1>
+            <p class="text-lg text-gray-400">Combine múltiplos ficheiros e serviços para uma análise unificada.</p>
+        </header>
+
+        <div class="mb-6 bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-lg">
+            <h2 class="text-xl font-semibold text-gray-100 mb-4">1. Carregar Ficheiros (Excel ou CSV)</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div>
+                    <label for="fileUploader1" class="block text-sm font-medium text-gray-300 mb-2">Ficheiro 1 (ex: Experiência)</label>
+                    <input type="file" id="fileUploader1" accept=".csv, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                           class="block w-full text-sm text-gray-400
+                                  file:mr-4 file:py-3 file:px-5 file:rounded-lg file:border-0
+                                  file:text-sm file:font-semibold
+                                  file:bg-blue-600 file:text-white
+                                  hover:file:bg-blue-500 cursor-pointer">
+                </div>
+                <div>
+                    <label for="fileUploader2" class="block text-sm font-medium text-gray-300 mb-2">Ficheiro 2 (ex: Atendimento)</label>
+                    <input type="file" id="fileUploader2" accept=".csv, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                           class="block w-full text-sm text-gray-400
+                                  file:mr-4 file:py-3 file:px-5 file:rounded-lg file:border-0
+                                  file:text-sm file:font-semibold
+                                  file:bg-gray-600 file:text-gray-100
+                                  hover:file:bg-gray-500 cursor-pointer">
+                </div>
+                <div>
+                    <label for="fileUploader3" class="block text-sm font-medium text-gray-300 mb-2">Ficheiro 3 (ex: Talk)</label>
+                    <input type="file" id="fileUploader3" accept=".csv, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+                           class="block w-full text-sm text-gray-400
+                                  file:mr-4 file:py-3 file:px-5 file:rounded-lg file:border-0
+                                  file:text-sm file:font-semibold
+                                  file:bg-purple-600 file:text-white
+                                  hover:file:bg-purple-500 cursor-pointer">
+                </div>
+            </div>
+            <button id="loadFilesButton" class="mt-6 w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-blue-700 btn-lift">
+                Carregar e Combinar Ficheiros
+            </button>
+            <p class="mt-4 text-xs text-gray-500 text-center">Carregue pelo menos um ficheiro para começar.</p>
+        </div>
+
+        <div id="loading-section" class="hidden flex-col items-center justify-center my-10 p-6 bg-gray-800 rounded-lg border border-gray-700 shadow-lg">
+            <div class="spinner"></div>
+            <p id="loading-text" class="mt-4 text-lg font-medium text-gray-300">A processar o ficheiro...</p>
+        </div>
+
+        <div id="filter-section" class="hidden mb-6 bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-lg">
+            
+            <h2 class="text-xl font-semibold text-gray-100 mb-4">2. Definir Filtros Cumulativos</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-x-8 gap-y-6">
+                
+                <div>
+                    <label for="serviceCombinerContainer" class="block text-lg font-semibold text-gray-100 mb-3">Serviços</label>
+                    <p class="text-sm text-gray-400 mb-3">Selecione um ou mais serviços.</p>
+                    <div id="serviceCombinerContainer" class="combiner-container grid grid-cols-1 gap-4 p-4 border border-gray-600 rounded-lg bg-gray-900">
+                    </div>
+                </div>
+                
+                <div>
+                    <label for="contaCombinerContainer" class="block text-lg font-semibold text-gray-100 mb-3">Contas</label>
+                    <p class="text-sm text-gray-400 mb-3">Selecione uma ou mais contas.</p>
+                    <div id="contaCombinerContainer" class="combiner-container grid grid-cols-1 gap-4 p-4 border border-gray-600 rounded-lg bg-gray-900">
+                    </div>
+                </div>
+
+                <div>
+                    <label for="setorCombinerContainer" class="block text-lg font-semibold text-gray-100 mb-3">Setor (Opcional)</label>
+                    <p class="text-sm text-gray-400 mb-3">Selecione um ou mais setores.</p>
+                    <div id="setorCombinerContainer" class="combiner-container grid grid-cols-1 gap-4 p-4 border border-gray-600 rounded-lg bg-gray-900">
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-6 pt-6 border-t border-gray-700 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                <div>
+                    <label for="dateStart" class="block text-lg font-semibold text-gray-100 mb-3">Período (Opcional)</label>
+                    <p class="text-sm text-gray-400 mb-3">Data Início:</p>
+                    <input type="date" id="dateStart" class="w-full p-2 border border-gray-600 rounded-lg bg-gray-900 text-gray-300 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-lg font-semibold text-gray-100 mb-3 opacity-0">Período</label>
+                    <p class="text-sm text-gray-400 mb-3">Data Fim:</p>
+                    <input type="date" id="dateEnd" class="w-full p-2 border border-gray-600 rounded-lg bg-gray-900 text-gray-300 focus:ring-blue-500 focus:border-blue-500">
+                </div>
+            </div>
+            
+            <button id="analyzeButton" class="mt-6 w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-green-700 btn-lift">
+                Analisar Seleção
+            </button>
+            
+            <div id="export-buttons" class="hidden mt-8 pt-6 border-t border-gray-700 flex flex-col md:flex-row gap-4">
+                <button id="exportFullReportButton" class="flex items-center justify-center w-full md:w-1/2 bg-gray-600 text-white font-semibold py-3 px-5 rounded-lg shadow hover:bg-gray-700 btn-lift">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    Exportar Relatório (CSV)
+                </button>
+                <button id="exportZeroReportButton" class="flex items-center justify-center w-full md:w-1/2 bg-red-600 text-white font-semibold py-3 px-5 rounded-lg shadow hover:bg-red-700 btn-lift">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 12v-7a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2h5.5M13 13h-6m4-4H7m0 8h.01M17 17l-4 4m0 0l-4-4m4 4V13" />
+                    </svg>
+                    Exportar Apenas Notas 0 (CSV)
+                </button>
+            </div>
+        </div>
+
+        <div id="results-section" class="hidden">
+            <div class="mb-8">
+                <h2 class="text-2xl font-semibold text-gray-100 mb-4">
+                    Visão Geral: 
+                    <span id="selectedServiceTitle" class="text-blue-400 block text-base md:inline"></span>
+                </h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div class="md:col-span-1 bg-gray-800 p-6 rounded-lg border border-gray-700 shadow-md flex flex-col items-center justify-center">
+                        <h3 class="text-lg font-semibold text-gray-300 mb-4">Satisfação Coletiva</h3>
+                        <div class="relative w-48 h-48">
+                            <canvas id="collectiveScoreChart"></canvas>
+                            <div id="chart-score-text" class="absolute inset-0 flex items-center justify-center text-3xl font-bold text-gray-100"></div>
+                        </div>
+                    </div>
+                    <div class="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                        <div class="bg-gray-800 border border-gray-700 p-6 rounded-lg shadow-md">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 bg-blue-900 text-blue-300 p-3 rounded-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-2.144M12 6a3 3 0 100-6 3 3 0 000 6zm0 8a3 3 0 100-6 3 3 0 000 6zm0 8a3 3 0 100-6 3 3 0 000 6z" />
+                                    </svg>
+                                </div>
+                                <div class="ml-4">
+                                    <h3 class="text-sm font-medium text-gray-400 truncate">Total de Atendimentos</h3>
+                                    <p id="kpi-total" class="mt-1 text-3xl font-semibold text-gray-100">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 border border-gray-700 p-6 rounded-lg shadow-md">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 bg-green-900 text-green-300 p-3 rounded-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </div>
+                                <div class="ml-4">
+                                    <h3 class="text-sm font-medium text-gray-400 truncate">Atendimentos Promotores</h3>
+                                    <p id="kpi-promoters" class="mt-1 text-3xl font-semibold text-green-400">0</p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-gray-800 border border-gray-700 p-6 rounded-lg shadow-md col-span-1 sm:col-span-2">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0 bg-indigo-900 text-indigo-300 p-3 rounded-lg">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
+                                    </svg>
+                                </div>
+                                <div class="ml-4">
+                                    <h3 class="text-sm font-medium text-gray-400 truncate">Taxa de Satisfação</h3>
+                                    <p id="kpi-score" class="mt-1 text-3xl font-semibold text-indigo-400">0.00%</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div>
+                <h2 class="text-2xl font-semibold text-gray-100 mb-4">Resultados por Agente</h2>
+                <div class="bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-700">
+                    <table class="min-w-full divide-y divide-gray-700">
+                        <thead class="bg-gray-700">
+                            <tr>
+                                <th class="pl-4 pr-2 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-10"></th>
+                                <th class="px-2 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Agente</th>
+                                <th class="px-2 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Satisfação</th>
+                                <th class="px-2 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Promotores</th>
+                                <th class="pl-2 pr-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Total Atendimentos</th>
+                            </tr>
+                        </thead>
+                        <tbody id="agentListContainer" class="bg-gray-800 divide-y divide-gray-700">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script defer>
+    
+    const ramalAgentMap = {
+        '1131': 'SAMARA',
+        '1132': 'CAMILA',
+        '1133': 'ELOISA',
+        '1134': 'BARBOSA',
+        '1135': 'LARISSA',
+        '1136': 'EDUARDO'
+    };
+
+    const setoresAgentes = {
+        CANCELAMENTO: [
+            'BARBOSA', 'ELOISA', 'LARISSA', 'EDUARDO', 'CAMILA', 'SAMARA'
+        ].map(name => name.trim().toUpperCase()),
+        NEGOCIACAO: [
+            'Carla', 'Lenk', 'Ana Luiza', 'JULIETTI', 'RODRIGO', 'Monalisa',
+            'Ramom', 'Ednael', 'Leticia', 'Rita', 'Mariana', 'Flavia s',
+            'Uri', 'Clara', 'Wanderson', 'Aparecida', 'Cristina', 'Caio', 'LUKAS'
+        ].map(name => name.trim().toUpperCase()),
+        SUPORTE: [
+            'VALERIO', 'TARCISIO', 'GRANJA', 'ALICE', 'FERNANDO', 'SANTOS', 'RENAN',
+            'FERREIRA', 'HUEMILLY', 'LOPES', 'LAUDEMILSON', 'RAYANE', 'LAYS', 'JORGE',
+            'LIGIA', 'ALESSANDRO', 'GEIBSON', 'ROBERTO', 'OLIVEIRA', 'MAURÍCIO',
+            'AVOLO', 'CLEBER', 'ROMERIO', 'JUNIOR', 'ISABELA', 'RENAN', 'WAGNER',
+            'CLAUDIA', 'ANTONIO', 'JOSE', 'LEONARDO', 'KLEBSON', 'OZENAIDE'
+        ].map(name => name.trim().toUpperCase()),
+        NRC: [
+            'RILDYVAN', 'MILENA', 'ALVES', 'MONICKE', 'AYLA', 'MARIANY', 'EDUARDA',
+            'MENEZES', 'JUCIENNY', 'MARIA', 'ANDREZA', 'LUZILENE', 'IGO', 'AIDA',
+            'Caribé', 'Michelly', 'ADRIA', 'ERICA', 'HENRIQUE', 'SHYRLEI', 'ANNA',
+            'JULIA', 'FERNANDES'
+        ].map(name => name.trim().toUpperCase())
+    };
+
+    // Mapa invertido para encontrar o setor de um agente rapidamente
+    const agenteSetorMap = {};
+    for (const setor in setoresAgentes) {
+        setoresAgentes[setor].forEach(agente => {
+            agenteSetorMap[agente] = setor;
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        
+        const fileUploader1 = document.getElementById('fileUploader1');
+        const fileUploader2 = document.getElementById('fileUploader2');
+        const fileUploader3 = document.getElementById('fileUploader3'); 
+        
+        const loadFilesButton = document.getElementById('loadFilesButton'); 
+        const loadingSection = document.getElementById('loading-section');
+        const loadingText = document.getElementById('loading-text');
+        const filterSection = document.getElementById('filter-section');
+        const serviceCombinerContainer = document.getElementById('serviceCombinerContainer'); 
+        const contaCombinerContainer = document.getElementById('contaCombinerContainer');
+        const setorCombinerContainer = document.getElementById('setorCombinerContainer');
+        const dateStartInput = document.getElementById('dateStart');
+        const dateEndInput = document.getElementById('dateEnd');
+        const analyzeButton = document.getElementById('analyzeButton');
+        const resultsSection = document.getElementById('results-section');
+        const exportButtonsContainer = document.getElementById('export-buttons');
+        const exportFullReportButton = document.getElementById('exportFullReportButton');
+        const exportZeroReportButton = document.getElementById('exportZeroReportButton');
+        const selectedServiceTitle = document.getElementById('selectedServiceTitle');
+        const kpiTotal = document.getElementById('kpi-total');
+        const kpiPromoters = document.getElementById('kpi-promoters');
+        const kpiScore = document.getElementById('kpi-score');
+        const agentListContainer = document.getElementById('agentListContainer');
+        const collectiveScoreChartEl = document.getElementById('collectiveScoreChart');
+        const chartScoreText = document.getElementById('chart-score-text');
+        let collectiveChart = null; 
+
+        let combinedData = []; 
+        let currentServiceData = []; 
+
+        function parseRowDate(dateInput) {
+            try {
+                if (dateInput instanceof Date && !isNaN(dateInput)) {
+                    const d = new Date(dateInput);
+                    d.setHours(0, 0, 0, 0);
+                    return d;
+                }
+                if (typeof dateInput === 'string') {
+                    const parts = dateInput.split(' ')[0].split('/');
+                    if (parts.length === 3) {
+                        const [day, month, year] = parts.map(Number);
+                        if (!isNaN(day) && !isNaN(month) && !isNaN(year)) {
+                            const d = new Date(year, month - 1, day);
+                            if (!isNaN(d)) {
+                                d.setHours(0, 0, 0, 0);
+                                return d;
+                            }
+                        }
+                    }
+                    const isoDate = new Date(dateInput);
+                    if (!isNaN(isoDate)) {
+                        isoDate.setHours(0, 0, 0, 0);
+                        return isoDate;
+                    }
+                }
+                return null;
+            } catch (e) {
+                console.warn("Erro ao fazer parse da data:", dateInput, e);
+                return null;
+            }
+        }
+        
+        function readFileAsJson(file, fileType) {
+            return new Promise((resolve, reject) => {
+                if (!file) {
+                    return resolve([]); 
+                }
+                
+                const reader = new FileReader();
+                reader.readAsArrayBuffer(file); 
+
+                reader.onload = (e) => {
+                    try {
+                        const data = new Uint8Array(e.target.result);
+                        const workbook = XLSX.read(data, { type: 'array', cellDates: true });
+                        
+                        let sheetName;
+                        let jsonData;
+                        let cleanedData = [];
+
+                        if (fileType === 3) {
+                            sheetName = workbook.SheetNames.find(name => name.toLowerCase().trim() !== 'geral');
+                            if (!sheetName) { sheetName = workbook.SheetNames[0]; }
+                            
+                            const worksheet = workbook.Sheets[sheetName];
+                            const jsonArray = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false });
+
+                            for (let i = 1; i < jsonArray.length; i++) {
+                                const row = jsonArray[i];
+                                if (!row || row.length < 3) continue;
+
+                                const rawDate = row[0];
+                                const rawTelefone = row[1];
+                                const rawOpcao = row[2];
+
+                                if (rawDate === undefined || rawDate === null || rawOpcao === undefined || rawOpcao === null) {
+                                    continue;
+                                }
+
+                                const ramal = rawTelefone ? rawTelefone.toString().trim() : null;
+                                const agentName = ramalAgentMap[ramal] || 'OUTROS RAMAIS';
+                                
+                                // Determina o setor automaticamente com base no agente mapeado
+                                const setorAutomatico = agenteSetorMap[agentName] || 'OUTROS';
+                                const parsedDateVal = parseRowDate(rawDate);
+
+                                if (parsedDateVal) {
+                                     cleanedData.push({
+                                        Agente: agentName,
+                                        Serviço: 'TALK', 
+                                        Conta: 'TALK',   
+                                        Opção: rawOpcao,
+                                        Data: rawDate, 
+                                        Protocolo: 'N/A (Talk)', 
+                                        Nome: rawTelefone, 
+                                        Setor: setorAutomatico, // Adiciona a propriedade Setor
+                                        parsedDate: parsedDateVal
+                                    });
+                                }
+                            }
+
+                        } else {
+                            sheetName = workbook.SheetNames[0];
+                            const worksheet = workbook.Sheets[sheetName];
+                            jsonData = XLSX.utils.sheet_to_json(worksheet, { cellDates: true });
+                            
+                             if (jsonData.length > 0) {
+                                const headers = Object.keys(jsonData[0]);
+                                const requiredCols = ['Agente', 'Serviço', 'Opção', 'Conta', 'Data'];
+                                const missingCols = requiredCols.filter(col => !headers.includes(col));
+                                if (missingCols.length > 0) {
+                                    throw new Error(`Ficheiro "${file.name}" não contém as colunas obrigatórias: ${missingCols.join(', ')}`);
+                                }
+                            }
+
+                            cleanedData = jsonData.map(row => {
+                                const agentName = row.Agente ? row.Agente.toString().trim().toUpperCase() : null;
+                                return {
+                                    ...row,
+                                    Agente: agentName,
+                                    Setor: agentName ? (agenteSetorMap[agentName] || 'OUTROS') : 'OUTROS', // Adiciona Setor
+                                    parsedDate: parseRowDate(row.Data)
+                                };
+                            }).filter(row => row.parsedDate !== null);
+                        }
+
+                        resolve(cleanedData); 
+
+                    } catch (err) {
+                        console.error("Erro no processamento do ficheiro:", file.name, err);
+                        reject(err);
+                    }
+                };
+                
+                reader.onerror = (err) => {
+                    reject(new Error('Erro ao ler o ficheiro: ' + file.name));
+                };
+            });
+        }
+
+        loadFilesButton.addEventListener('click', async () => {
+            const file1 = fileUploader1.files[0];
+            const file2 = fileUploader2.files[0];
+            const file3 = fileUploader3.files[0]; 
+
+            if (!file1 && !file2 && !file3) { 
+                showErrorModal('Por favor, carregue pelo menos um ficheiro.');
+                return;
+            }
+
+            combinedData = [];
+            currentServiceData = []; 
+            filterSection.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+            exportButtonsContainer.classList.add('hidden'); 
+            serviceCombinerContainer.innerHTML = ''; 
+            contaCombinerContainer.innerHTML = '';
+            setorCombinerContainer.innerHTML = '';
+            loadingSection.classList.remove('hidden');
+            loadingText.textContent = 'A processar ficheiros...';
+
+            try {
+                const results = await Promise.all([
+                    readFileAsJson(file1, 1), 
+                    readFileAsJson(file2, 2), 
+                    readFileAsJson(file3, 3)  
+                ]);
+
+                combinedData = results.flat();
+
+                if (combinedData.length === 0) {
+                    throw new Error("Nenhum dado válido encontrado ou datas não puderam ser lidas.");
+                }
+
+                loadingText.textContent = 'Ficheiros combinados! A extrair dados...';
+                
+                const services = [...new Set(combinedData.map(row => row.Serviço))];
+                const contas = [...new Set(combinedData.map(row => row.Conta))];
+                const setores = Object.keys(setoresAgentes);
+                // Adiciona 'OUTROS' se houver agentes sem setor definido
+                if (combinedData.some(row => row.Setor === 'OUTROS')) {
+                    if (!setores.includes('OUTROS')) setores.push('OUTROS');
+                }
+                
+                setTimeout(() => {
+                    populateCombiner(serviceCombinerContainer, services);
+                    populateCombiner(contaCombinerContainer, contas);
+                    populateCombiner(setorCombinerContainer, setores);
+                    loadingSection.classList.add('hidden');
+                    filterSection.classList.remove('hidden');
+                }, 500);
+
+            } catch (err) {
+                loadingSection.classList.add('hidden');
+                showErrorModal(`Erro ao processar os ficheiros: ${err.message}`);
+                console.error(err);
+            }
+        });
+        
+        function populateCombiner(container, itemsSet) {
+            container.innerHTML = ''; 
+            itemsSet.filter(item => item).sort().forEach(item => {
+                const label = document.createElement('label');
+                label.className = 'flex items-center space-x-2 p-2 rounded-md hover:bg-gray-700 cursor-pointer';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.className = 'form-checkbox h-5 w-5 text-blue-600 rounded focus:ring-blue-500 bg-gray-800 border-gray-600';
+                checkbox.value = item;
+                
+                const span = document.createElement('span');
+                span.className = 'text-gray-300 text-sm';
+                span.textContent = item;
+                
+                label.appendChild(checkbox);
+                label.appendChild(span);
+                container.appendChild(label);
+            });
+        }
+
+        function getSelectedItems(container) {
+             return Array.from(
+                container.querySelectorAll('input[type="checkbox"]:checked')
+            ).map(cb => cb.value);
+        }
+
+        analyzeButton.addEventListener('click', () => {
+            const selectedServices = getSelectedItems(serviceCombinerContainer);
+            const selectedContas = getSelectedItems(contaCombinerContainer);
+            const selectedSetores = getSelectedItems(setorCombinerContainer);
+            
+            let dateStart = dateStartInput.value ? new Date(dateStartInput.value + 'T00:00:00') : null;
+            let dateEnd = dateEndInput.value ? new Date(dateEndInput.value + 'T23:59:59') : null;
+
+            if (selectedServices.length === 0 && selectedContas.length === 0 && selectedSetores.length === 0) {
+                showErrorModal('Por favor, selecione pelo menos um filtro (Serviço, Conta ou Setor) para analisar.');
+                return;
+            }
+            
+            currentServiceData = combinedData.filter(row => {
+                const servicoMatch = selectedServices.length === 0 || selectedServices.includes(row.Serviço);
+                const contaMatch = selectedContas.length === 0 || selectedContas.includes(row.Conta);
+                // Filtro de setor agora usa a propriedade 'Setor' pré-calculada em cada linha
+                const setorMatch = selectedSetores.length === 0 || selectedSetores.includes(row.Setor);
+                
+                const dateMatch = 
+                    (!dateStart || row.parsedDate >= dateStart) &&
+                    (!dateEnd || row.parsedDate <= dateEnd);
+
+                return servicoMatch && contaMatch && setorMatch && dateMatch;
+            });
+
+            const titleParts = [];
+            if (selectedServices.length > 0) titleParts.push(`Serviços: [${selectedServices.join(', ')}]`);
+            if (selectedContas.length > 0) titleParts.push(`Contas: [${selectedContas.join(', ')}]`);
+            if (selectedSetores.length > 0) titleParts.push(`Setores: [${selectedSetores.join(', ')}]`);
+            
+            if(dateStart || dateEnd) {
+                const startStr = dateStart ? dateStartInput.value.split('-').reverse().join('/') : 'Início';
+                const endStr = dateEnd ? dateEndInput.value.split('-').reverse().join('/') : 'Fim';
+                titleParts.push(`Período: [${startStr} - ${endStr}]`);
+            }
+            
+            const title = titleParts.length > 0 ? titleParts.join(' E ') : 'Análise de Todos os Dados';
+            selectedServiceTitle.textContent = title;
+            
+            if (currentServiceData.length === 0) {
+                showErrorModal('Nenhum dado encontrado para esta combinação de filtros.');
+                resultsSection.classList.add('hidden');
+                exportButtonsContainer.classList.add('hidden');
+                return;
+            }
+            
+            resultsSection.classList.remove('hidden');
+            exportButtonsContainer.classList.remove('hidden');
+            processAndDisplayMetrics(currentServiceData);
+            
+            updateExportButtonNames(title);
+        });
+        
+        function updateExportButtonNames(baseTitle) {
+            const safeFilename = baseTitle.replace(/[^a-z0-9_.-]/gi, '_').toLowerCase();
+            
+            exportFullReportButton.dataset.filename = `relatorio_completo_${safeFilename}`;
+            exportZeroReportButton.dataset.filename = `relatorio_notas_0_${safeFilename}`;
+            
+            exportFullReportButton.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+                Exportar Relatório (${currentServiceData.length} linhas)
+            `;
+        }
+        
+        exportFullReportButton.addEventListener('click', () => {
+            if (currentServiceData.length === 0) {
+                showErrorModal('Não há dados analisados para exportar.');
+                return;
+            }
+            const filename = exportFullReportButton.dataset.filename || 'relatorio_combinado';
+            exportDataToCsv(currentServiceData, filename);
+        });
+
+        exportZeroReportButton.addEventListener('click', () => {
+            if (currentServiceData.length === 0) {
+                showErrorModal('Não há dados analisados para filtrar.');
+                return;
+            }
+            
+            const dataToExport = currentServiceData.filter(row => {
+                const note = parseInt(row.Opção, 10);
+                return note === 0;
+            });
+
+            if (dataToExport.length === 0) {
+                showErrorModal('Não foram encontradas notas 0 para este grupo.');
+                return;
+            }
+            
+            const filename = exportZeroReportButton.dataset.filename || 'relatorio_notas_0_combinado';
+            exportDataToCsv(dataToExport, filename);
+        });
+        
+        function processAndDisplayMetrics(serviceData) {
+            let collectiveTotal = 0;
+            let collectivePromoters = 0;
+            const agentMetrics = {}; 
+
+            serviceData.forEach(row => {
+                const agent = row.Agente ? row.Agente : 'Agente Desconhecido'; 
+                const note = parseInt(row.Opção, 10);
+
+                if (!agent || isNaN(note)) {
+                    return;
+                }
+
+                if (!agentMetrics[agent]) {
+                    agentMetrics[agent] = {
+                        total: 0,
+                        promoters: 0,
+                        details: []
+                    };
+                }
+
+                collectiveTotal++;
+                agentMetrics[agent].total++;
+
+                if (note >= 8) {
+                    collectivePromoters++;
+                    agentMetrics[agent].promoters++;
+                }
+
+                agentMetrics[agent].details.push(row); 
+            });
+            
+            const collectiveScore = (collectiveTotal > 0) ? (collectivePromoters / collectiveTotal) * 100 : 0;
+
+            kpiTotal.textContent = collectiveTotal.toLocaleString('pt-BR');
+            kpiPromoters.textContent = collectivePromoters.toLocaleString('pt-BR');
+            kpiScore.textContent = `${collectiveScore.toFixed(2)}%`;
+            chartScoreText.textContent = `${collectiveScore.toFixed(2)}%`;
+
+            drawCollectiveChart(collectiveScore);
+
+            const agentArray = Object.keys(agentMetrics).map(agentName => {
+                const agent = agentMetrics[agentName];
+                const score = (agent.total > 0) ? (agent.promoters / agent.total) * 100 : 0;
+                return {
+                    name: agentName,
+                    score: score,
+                    promoters: agent.promoters,
+                    total: agent.total,
+                    details: agent.details
+                };
+            });
+
+            agentArray.sort((a, b) => b.score - a.score);
+
+            displayAgentList(agentArray);
+        }
+        
+        function drawCollectiveChart(score) {
+            if (collectiveChart) {
+                collectiveChart.destroy(); 
+            }
+            
+            const ctx = collectiveScoreChartEl.getContext('2d');
+            const data = {
+                datasets: [{
+                    data: [score, 100 - score],
+                    backgroundColor: [
+                        score >= 80 ? '#16a34a' : score >= 60 ? '#facc15' : '#dc2626', 
+                        '#4b5563' 
+                    ],
+                    borderWidth: 0,
+                    borderRadius: 5,
+                }],
+            };
+
+            collectiveChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: data,
+                options: {
+                    cutout: '80%', 
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false },
+                    }
+                }
+            });
+        }
+
+        function displayAgentList(agentArray) {
+            agentListContainer.innerHTML = ''; 
+
+            if (agentArray.length === 0) {
+                agentListContainer.innerHTML = `<tr><td colspan="5" class="text-center text-gray-500 py-6">Nenhum agente encontrado para esta seleção.</td></tr>`;
+                return;
+            }
+
+            agentArray.forEach((agent, index) => {
+                const score = agent.score;
+                let scoreColor = 'text-gray-300'; 
+                if (score >= 80) scoreColor = 'text-green-400 font-semibold';
+                else if (score < 60) scoreColor = 'text-red-400 font-semibold';
+
+                const agentId = `agent-row-${index}`;
+
+                const headerRow = document.createElement('tr');
+                headerRow.className = 'agent-header cursor-pointer hover:bg-gray-700';
+                headerRow.setAttribute('data-target', agentId);
+                headerRow.innerHTML = `
+                    <td class="pl-4 pr-2 py-4 whitespace-nowrap">
+                        <svg class="w-5 h-5 text-gray-500 expand-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                    </td>
+                    <td class="px-2 py-4 whitespace-nowrap text-sm font-medium text-gray-100">${agent.name}</td>
+                    <td class="px-2 py-4 whitespace-nowrap text-sm ${scoreColor}">${agent.score.toFixed(2)}%</td>
+                    <td class="px-2 py-4 whitespace-nowrap text-sm text-gray-400">${agent.promoters}</td>
+                    <td class="pl-2 pr-4 py-4 whitespace-nowrap text-sm text-gray-400">${agent.total}</td>
+                `;
+                
+                const detailsGroup = document.createElement('tbody');
+                detailsGroup.className = 'agent-details bg-gray-900';
+                detailsGroup.id = agentId;
+
+                detailsGroup.innerHTML = `
+                    <tr class="font-semibold text-xs text-gray-400">
+                        <td class="px-6 py-2" colspan="2">Cliente/Telefone</td>
+                        <td class="px-6 py-2">Protocolo</td>
+                        <td class="px-6 py-2">Data</td>
+                        <td class="px-6 py-2">Nota</td>
+                    </tr>
+                `;
+
+                agent.details.forEach(detail => {
+                    const note = parseInt(detail.Opção, 10);
+                    let noteColor = 'text-gray-300';
+                    if (note >= 8) noteColor = 'text-green-400 font-bold';
+                    else if (note < 6) noteColor = 'text-red-400 font-bold';
+                    
+                    // Formatação da data para exibição (se for um objeto Date)
+                    let displayDate = detail.Data;
+                    if (detail.Data instanceof Date) {
+                        displayDate = detail.Data.toLocaleDateString('pt-BR');
+                    }
+
+                    const detailRow = document.createElement('tr');
+                    detailRow.className = 'text-sm text-gray-300';
+                    detailRow.innerHTML = `
+                        <td style="width: 10px;"></td>
+                        <td class="pl-6 pr-2 py-2" colspan="1">${detail.Nome || 'N/A'}</td>
+                        <td class="px-2 py-2">${detail.Protocolo || 'N/A'}</td>
+                        <td class="px-2 py-2 whitespace-nowrap">${displayDate || 'N/A'}</td>
+                        <td class="pl-2 pr-6 py-2 text-center ${noteColor}">${isNaN(note) ? '-' : note}</td>
+                    `;
+                    detailsGroup.appendChild(detailRow);
+                });
+
+                agentListContainer.appendChild(headerRow);
+                agentListContainer.appendChild(detailsGroup);
+            });
+        }
+
+        agentListContainer.addEventListener('click', (event) => {
+            const header = event.target.closest('.agent-header');
+            if (!header) return; 
+
+            const targetId = header.getAttribute('data-target');
+            const icon = header.querySelector('.expand-icon');
+
+            if (header.classList.contains('open')) {
+                header.classList.remove('open');
+                icon.style.transform = 'rotate(0deg)';
+            } else {
+                header.classList.add('open');
+                icon.style.transform = 'rotate(90deg)';
+            }
+        });
+
+        function showErrorModal(message) {
+            const oldModal = document.getElementById('error-modal');
+            if (oldModal) oldModal.remove();
+
+            const modal = document.createElement('div');
+            modal.id = 'error-modal';
+            modal.className = 'fixed inset-0 bg-gray-900 bg-opacity-75 overflow-y-auto h-full w-full flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="relative p-8 bg-gray-800 w-full max-w-md m-auto flex-col flex rounded-lg shadow-lg border border-gray-700">
+                    <h3 class="text-xl font-semibold text-red-400 mb-4">Erro</h3>
+                    <p class="text-gray-300 mb-6">${message}</p>
+                    <button id="close-modal-btn" class="ml-auto px-6 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">
+                        Fechar
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+
+            document.getElementById('close-modal-btn').onclick = () => {
+                modal.remove();
+            };
+        }
+
+        function exportDataToCsv(data, filename) {
+            try {
+                const formattedData = data.map(row => ({
+                    'Agente': row.Agente || 'N/A',
+                    'Setor': row.Setor || 'N/A', // Adiciona o Setor ao CSV também
+                    'Cliente/Telefone': row.Nome || 'N/A', 
+                    'Protocolo': row.Protocolo || 'N/A',
+                    'Data': (row.Data instanceof Date) ? row.Data.toLocaleDateString('pt-BR') : (row.Data || 'N/A'),
+                    'Nota': parseInt(row.Opção, 10),
+                    'Serviço': row.Serviço || 'N/A',
+                    'Conta': row.Conta || 'N/A'
+                }));
+                
+                const ws = XLSX.utils.json_to_sheet(formattedData);
+                
+                const csv = XLSX.utils.sheet_to_csv(ws, { FS: ";" });
+                
+                const blob = new Blob(["\uFEFF" + csv], { type: 'text/csv;charset=utf-8;' }); 
+                const link = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                const safeFilename = filename.replace(/[^a-z0-9_.-]/gi, '_') + '.csv';
+                
+                link.setAttribute('href', url);
+                link.setAttribute('download', safeFilename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+            } catch (err) {
+                console.error("Erro ao exportar CSV:", err);
+                showErrorModal(`Falha ao gerar o ficheiro CSV: ${err.message}`);
+            }
+        }
+
+    }); 
+    </script>
+</body>
+</html>
