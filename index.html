@@ -5,23 +5,37 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Satisfador 2.0 - Combinador de Análises</title>
     
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Usando uma versão mais recente e robusta do SheetJS -->
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
     
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #111827;
+            background-color: #111827; /* Fallback caso o Tailwind falhe no load */
         }
         .agent-details { display: none; }
         .agent-header.open + .agent-details { display: table-row-group; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .spinner {
             border: 4px solid rgba(255, 255, 255, 0.1);
-            border-left-color: #09f;
+            border-left-color: #3b82f6; /* Cor azul do tailwind */
             border-radius: 50%;
             width: 40px;
             height: 40px;
@@ -36,13 +50,27 @@
             max-height: 150px;
             overflow-y: auto;
         }
+        /* Scrollbar personalizada para combinar com o tema dark */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1f2937; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #4b5563; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #6b7280; 
+        }
     </style>
 </head>
-<body class="antialiased">
+<body class="antialiased bg-gray-900 text-gray-100">
     <div class="container mx-auto max-w-7xl p-4 md:p-8">
         
         <header class="mb-8 p-6 bg-gray-800 rounded-lg border border-gray-700 shadow-lg">
-            <h1 class="text-3xl font-bold text-gray-100">Satisfador 2.0</h1>
+            <h1 class="text-3xl font-bold text-white">Satisfador 2.0</h1>
             <p class="text-lg text-gray-400">Combine múltiplos ficheiros e serviços para uma análise unificada.</p>
         </header>
 
@@ -52,38 +80,26 @@
                 <div>
                     <label for="fileUploader1" class="block text-sm font-medium text-gray-300 mb-2">Ficheiro 1 (ex: Experiência)</label>
                     <input type="file" id="fileUploader1" accept=".csv, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-                           class="block w-full text-sm text-gray-400
-                                  file:mr-4 file:py-3 file:px-5 file:rounded-lg file:border-0
-                                  file:text-sm file:font-semibold
-                                  file:bg-blue-600 file:text-white
-                                  hover:file:bg-blue-500 cursor-pointer">
+                           class="block w-full text-sm text-gray-400 file:mr-4 file:py-3 file:px-5 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-500 cursor-pointer bg-gray-700 rounded-lg border border-gray-600 placeholder-gray-400 focus:outline-none focus:border-blue-500">
                 </div>
                 <div>
                     <label for="fileUploader2" class="block text-sm font-medium text-gray-300 mb-2">Ficheiro 2 (ex: Atendimento)</label>
                     <input type="file" id="fileUploader2" accept=".csv, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-                           class="block w-full text-sm text-gray-400
-                                  file:mr-4 file:py-3 file:px-5 file:rounded-lg file:border-0
-                                  file:text-sm file:font-semibold
-                                  file:bg-gray-600 file:text-gray-100
-                                  hover:file:bg-gray-500 cursor-pointer">
+                           class="block w-full text-sm text-gray-400 file:mr-4 file:py-3 file:px-5 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-gray-600 file:text-gray-100 hover:file:bg-gray-500 cursor-pointer bg-gray-700 rounded-lg border border-gray-600 placeholder-gray-400 focus:outline-none focus:border-gray-500">
                 </div>
                 <div>
                     <label for="fileUploader3" class="block text-sm font-medium text-gray-300 mb-2">Ficheiro 3 (ex: Talk)</label>
                     <input type="file" id="fileUploader3" accept=".csv, .xlsx, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
-                           class="block w-full text-sm text-gray-400
-                                  file:mr-4 file:py-3 file:px-5 file:rounded-lg file:border-0
-                                  file:text-sm file:font-semibold
-                                  file:bg-purple-600 file:text-white
-                                  hover:file:bg-purple-500 cursor-pointer">
+                           class="block w-full text-sm text-gray-400 file:mr-4 file:py-3 file:px-5 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-600 file:text-white hover:file:bg-purple-500 cursor-pointer bg-gray-700 rounded-lg border border-gray-600 placeholder-gray-400 focus:outline-none focus:border-purple-500">
                 </div>
             </div>
-            <button id="loadFilesButton" class="mt-6 w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-blue-700 btn-lift">
+            <button id="loadFilesButton" class="mt-6 w-full bg-blue-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-blue-700 btn-lift transition-colors">
                 Carregar e Combinar Ficheiros
             </button>
             <p class="mt-4 text-xs text-gray-500 text-center">Carregue pelo menos um ficheiro para começar.</p>
         </div>
 
-        <div id="loading-section" class="hidden flex-col items-center justify-center my-10 p-6 bg-gray-800 rounded-lg border border-gray-700 shadow-lg">
+        <div id="loading-section" class="hidden flex flex-col items-center justify-center my-10 p-6 bg-gray-800 rounded-lg border border-gray-700 shadow-lg">
             <div class="spinner"></div>
             <p id="loading-text" class="mt-4 text-lg font-medium text-gray-300">A processar o ficheiro...</p>
         </div>
@@ -119,27 +135,27 @@
                 <div>
                     <label for="dateStart" class="block text-lg font-semibold text-gray-100 mb-3">Período (Opcional)</label>
                     <p class="text-sm text-gray-400 mb-3">Data Início:</p>
-                    <input type="date" id="dateStart" class="w-full p-2 border border-gray-600 rounded-lg bg-gray-900 text-gray-300 focus:ring-blue-500 focus:border-blue-500">
+                    <input type="date" id="dateStart" class="w-full p-2 border border-gray-600 rounded-lg bg-gray-900 text-gray-300 focus:ring-blue-500 focus:border-blue-500 outline-none">
                 </div>
                 <div>
                     <label class="block text-lg font-semibold text-gray-100 mb-3 opacity-0">Período</label>
                     <p class="text-sm text-gray-400 mb-3">Data Fim:</p>
-                    <input type="date" id="dateEnd" class="w-full p-2 border border-gray-600 rounded-lg bg-gray-900 text-gray-300 focus:ring-blue-500 focus:border-blue-500">
+                    <input type="date" id="dateEnd" class="w-full p-2 border border-gray-600 rounded-lg bg-gray-900 text-gray-300 focus:ring-blue-500 focus:border-blue-500 outline-none">
                 </div>
             </div>
             
-            <button id="analyzeButton" class="mt-6 w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-green-700 btn-lift">
+            <button id="analyzeButton" class="mt-6 w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg shadow-lg hover:bg-green-700 btn-lift transition-colors">
                 Analisar Seleção
             </button>
             
             <div id="export-buttons" class="hidden mt-8 pt-6 border-t border-gray-700 flex flex-col md:flex-row gap-4">
-                <button id="exportFullReportButton" class="flex items-center justify-center w-full md:w-1/2 bg-gray-600 text-white font-semibold py-3 px-5 rounded-lg shadow hover:bg-gray-700 btn-lift">
+                <button id="exportFullReportButton" class="flex items-center justify-center w-full md:w-1/2 bg-gray-600 text-white font-semibold py-3 px-5 rounded-lg shadow hover:bg-gray-700 btn-lift transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                     </svg>
                     Exportar Relatório (CSV)
                 </button>
-                <button id="exportZeroReportButton" class="flex items-center justify-center w-full md:w-1/2 bg-red-600 text-white font-semibold py-3 px-5 rounded-lg shadow hover:bg-red-700 btn-lift">
+                <button id="exportZeroReportButton" class="flex items-center justify-center w-full md:w-1/2 bg-red-600 text-white font-semibold py-3 px-5 rounded-lg shadow hover:bg-red-700 btn-lift transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 12v-7a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2h5.5M13 13h-6m4-4H7m0 8h.01M17 17l-4 4m0 0l-4-4m4 4V13" />
                     </svg>
@@ -381,15 +397,15 @@
 
                                 if (parsedDateVal) {
                                      cleanedData.push({
-                                        Agente: agentName,
-                                        Serviço: 'TALK', 
-                                        Conta: 'TALK',   
-                                        Opção: rawOpcao,
-                                        Data: rawDate, 
-                                        Protocolo: 'N/A (Talk)', 
-                                        Nome: rawTelefone, 
-                                        Setor: setorAutomatico, // Adiciona a propriedade Setor
-                                        parsedDate: parsedDateVal
+                                         Agente: agentName,
+                                         Serviço: 'TALK', 
+                                         Conta: 'TALK',    
+                                         Opção: rawOpcao,
+                                         Data: rawDate, 
+                                         Protocolo: 'N/A (Talk)', 
+                                         Nome: rawTelefone, 
+                                         Setor: setorAutomatico, // Adiciona a propriedade Setor
+                                         parsedDate: parsedDateVal
                                     });
                                 }
                             }
@@ -805,7 +821,7 @@
                 <div class="relative p-8 bg-gray-800 w-full max-w-md m-auto flex-col flex rounded-lg shadow-lg border border-gray-700">
                     <h3 class="text-xl font-semibold text-red-400 mb-4">Erro</h3>
                     <p class="text-gray-300 mb-6">${message}</p>
-                    <button id="close-modal-btn" class="ml-auto px-6 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700">
+                    <button id="close-modal-btn" class="ml-auto px-6 py-2 bg-red-600 text-white font-semibold rounded-lg hover:bg-red-700 transition-colors">
                         Fechar
                     </button>
                 </div>
