@@ -9,13 +9,11 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-    <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     
     <style>
-        /* --- ESTILOS MANUAIS (CSS NATIVO) --- 
-           Isso substitui o Tailwind para garantir que funcione sempre. 
-        */
+        /* --- ESTILOS MANUAIS (CSS NATIVO) --- */
         :root {
             --bg-body: #111827;
             --bg-card: #1f2937;
@@ -106,7 +104,7 @@
             box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.3);
         }
 
-        /* Estilo especial para o input file para ficar mais bonito */
+        /* Estilo especial para o input file */
         input[type="file"] {
             padding: 0.4rem;
             font-size: 0.875rem;
@@ -121,7 +119,6 @@
             cursor: pointer;
             font-weight: 600;
         }
-        /* Hack para diferenciar cores dos botões de upload */
         #fileUploader1::-webkit-file-upload-button { background-color: #2563eb; }
         #fileUploader2::-webkit-file-upload-button { background-color: #4b5563; }
         #fileUploader3::-webkit-file-upload-button { background-color: #9333ea; }
@@ -225,6 +222,7 @@
         .text-green { color: #4ade80; }
         .text-red { color: #f87171; }
         .text-indigo { color: #818cf8; }
+        .text-gray { color: #9ca3af; }
         .bg-blue-dark { background-color: #1e3a8a; color: #93c5fd; }
         .bg-green-dark { background-color: #14532d; color: #86efac; }
         .bg-indigo-dark { background-color: #312e81; color: #a5b4fc; }
