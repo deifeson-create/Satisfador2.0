@@ -12,8 +12,11 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
     
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
     <style>
-        /* --- ESTILOS MANUAIS (CSS NATIVO) --- */
+        /* --- ESTILOS MANTIDOS IGUAIS --- */
         :root {
             --bg-body: #111827;
             --bg-card: #1f2937;
@@ -151,6 +154,10 @@
 
         .btn-danger { background-color: var(--danger); }
         .btn-danger:hover { background-color: var(--danger-hover); }
+
+        /* Novo estilo para botão de Excel */
+        .btn-excel { background-color: #107c41; }
+        .btn-excel:hover { background-color: #0c6132; }
 
         .flex-btn-group {
             display: flex;
@@ -324,8 +331,8 @@
             </div>
             
             <div id="export-buttons" class="flex-btn-group hidden">
-                <button id="exportFullReportButton" class="btn btn-secondary">
-                    Exportar Relatório (CSV)
+                <button id="exportFullReportButton" class="btn btn-excel">
+                    Exportar Relatório Excel (Com Gráficos)
                 </button>
                 <button id="exportZeroReportButton" class="btn btn-danger">
                     Exportar Apenas Notas 0 (CSV)
@@ -409,6 +416,7 @@
 
     <script defer>
     
+    // Configurações de Agentes e Ramais mantidas
     const ramalAgentMap = {
         '1131': 'SAMARA',
         '1132': 'CAMILA',
@@ -481,6 +489,7 @@
         let combinedData = []; 
         let currentServiceData = []; 
 
+        // Função de Parse de Data
         function parseRowDate(dateInput) {
             try {
                 if (dateInput instanceof Date && !isNaN(dateInput)) {
@@ -513,6 +522,7 @@
             }
         }
         
+        // Leitura de arquivo (Mantido SheetJS)
         function readFileAsJson(file, fileType) {
             return new Promise((resolve, reject) => {
                 if (!file) {
@@ -608,6 +618,8 @@
                 };
             });
         }
+
+        // --- Lógica de Interface ---
 
         loadFilesButton.addEventListener('click', async () => {
             const file1 = fileUploader1.files[0];
@@ -757,19 +769,96 @@
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" style="margin-right: 8px; display: inline-block; vertical-align: middle;">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                 </svg>
-                Exportar Relatório (${currentServiceData.length} linhas)
+                Exportar Relatório Excel (${currentServiceData.length} linhas)
             `;
         }
         
-        exportFullReportButton.addEventListener('click', () => {
+        // --- NOVA LÓGICA DE EXPORTAÇÃO EXCEL + GRÁFICO ---
+        
+        exportFullReportButton.addEventListener('click', async () => {
             if (currentServiceData.length === 0) {
                 showErrorModal('Não há dados analisados para exportar.');
                 return;
             }
-            const filename = exportFullReportButton.dataset.filename || 'relatorio_combinado';
-            exportDataToCsv(currentServiceData, filename);
+            
+            const filename = (exportFullReportButton.dataset.filename || 'relatorio_combinado') + '.xlsx';
+            
+            // 1. Criar Workbook
+            const workbook = new ExcelJS.Workbook();
+            workbook.creator = 'Satisfador 2.0';
+            workbook.created = new Date();
+
+            // --- ABA 1: DADOS ---
+            const sheet1 = workbook.addWorksheet('Dados Detalhados');
+            
+            // Definir Colunas
+            sheet1.columns = [
+                { header: 'Agente', key: 'Agente', width: 25 },
+                { header: 'Setor', key: 'Setor', width: 15 },
+                { header: 'Cliente/Telefone', key: 'Nome', width: 20 },
+                { header: 'Protocolo', key: 'Protocolo', width: 20 },
+                { header: 'Data', key: 'Data', width: 15 },
+                { header: 'Nota', key: 'Nota', width: 10 },
+                { header: 'Serviço', key: 'Serviço', width: 15 },
+                { header: 'Conta', key: 'Conta', width: 15 }
+            ];
+
+            // Estilizar Cabeçalho
+            sheet1.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+            sheet1.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1F2937' } };
+
+            // Adicionar Linhas
+            currentServiceData.forEach(row => {
+                sheet1.addRow({
+                    Agente: row.Agente || 'N/A',
+                    Setor: row.Setor || 'N/A',
+                    Nome: row.Nome || 'N/A',
+                    Protocolo: row.Protocolo || 'N/A',
+                    Data: (row.Data instanceof Date) ? row.Data.toLocaleDateString('pt-BR') : (row.Data || 'N/A'),
+                    Nota: parseInt(row.Opção, 10),
+                    Serviço: row.Serviço || 'N/A',
+                    Conta: row.Conta || 'N/A'
+                });
+            });
+
+            // --- ABA 2: GRÁFICOS ---
+            const sheet2 = workbook.addWorksheet('Resumo Gráfico');
+
+            // Pegar imagem do Chart.js
+            const canvas = document.getElementById('collectiveScoreChart');
+            const imgData = canvas.toDataURL('image/png');
+            
+            // Adicionar imagem ao Workbook
+            const imageId = workbook.addImage({
+                base64: imgData,
+                extension: 'png',
+            });
+
+            // Posicionar imagem na planilha (Célula B2 até H20)
+            sheet2.addImage(imageId, {
+                tl: { col: 1, row: 1 },
+                ext: { width: 500, height: 500 }
+            });
+
+            // Adicionar Título na Aba Gráfica
+            sheet2.mergeCells('B1:F1');
+            const titleCell = sheet2.getCell('B1');
+            titleCell.value = 'Satisfação Coletiva - Visualização';
+            titleCell.font = { size: 16, bold: true };
+            titleCell.alignment = { horizontal: 'center' };
+
+            // --- SALVAR ---
+            try {
+                const buffer = await workbook.xlsx.writeBuffer();
+                saveAs(new Blob([buffer]), filename);
+            } catch (err) {
+                console.error("Erro ao gerar Excel:", err);
+                showErrorModal('Erro ao gerar arquivo Excel. Verifique o console.');
+            }
         });
 
+        // Botão de Notas 0 (Mantido como CSV simples, ou pode ser Excel sem gráfico se preferir)
+        // Mantivemos CSV como original para não complicar, mas usando o código original
         exportZeroReportButton.addEventListener('click', () => {
             if (currentServiceData.length === 0) {
                 showErrorModal('Não há dados analisados para filtrar.');
@@ -786,7 +875,8 @@
                 return;
             }
             
-            const filename = exportZeroReportButton.dataset.filename || 'relatorio_notas_0_combinado';
+            const filename = (exportZeroReportButton.dataset.filename || 'relatorio_notas_0_combinado');
+            // Usando a função antiga de CSV para este relatório específico
             exportDataToCsv(dataToExport, filename);
         });
         
@@ -994,6 +1084,7 @@
             };
         }
 
+        // Função antiga (mantida para o botão de Notas 0)
         function exportDataToCsv(data, filename) {
             try {
                 const formattedData = data.map(row => ({
